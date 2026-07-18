@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GG's Cookie Quest</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;500;600;700;800&family=Fredoka:wght@400;500;600;700&display=swap');
+
+:root{
+  --ink:#4A2E1A;
+  --ink-soft:#F3DFB8;
+  --cream:#FFF8EC;
+  --cream-dim:#F5E6C8;
+  --butter:#D98E3B;
+  --cherry:#B23A2E;
+  --sage:#8A9A5B;
+  --muted:#9A7B54;
+  --line: rgba(74,46,26,0.16);
+  --map-filter: none;
+}
+body.dark-mode{
+  --ink:#F3E3C8;
+  --ink-soft:#3A2415;
+  --cream:#20140A;
+  --cream-dim:#2A1A0E;
+  --butter:#E8A93C;
+  --cherry:#E06A55;
+  --sage:#A3B879;
+  --muted:#C9A87C;
+  --line: rgba(243,227,200,0.14);
+  --map-filter: brightness(0.85);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;height:100%;background:var(--cream);color:var(--ink);font-family:'Nunito',sans-serif;overflow:hidden;transition:background .25s,color .25s;}
+
+.app{display:grid;grid-template-columns:400px 1fr;height:100vh;}
+@media (max-width:860px){
+  .app{display:flex;flex-direction:column;height:100vh;height:100dvh;position:relative;overflow:hidden;}
+  html,body{overflow:hidden;height:100%;}
+  #map{position:relative;flex:1;min-height:0;width:100%;order:2;}
+}
+
+/* ---------- SIDEBAR ---------- */
+.sidebar{
+  background:var(--cream);
+  border-right:1px solid var(--line);
+  display:flex;flex-direction:column;
+  height:100vh;
+  transition:background .25s;
+}
+@media (max-width:860px){
+  .sidebar{
+    position:static;height:auto;width:100%;
+    border-right:none;border-bottom:1px solid var(--line);
+    flex:0 0 auto;order:1;
+    display:block;
+  }
+}
+
+.list-drawer{
+  display:flex;flex-direction:column;flex:1;min-height:0;
+}
+@media (max-width:860px){
+  .list-drawer{
+    position:fixed;left:0;right:0;bottom:0;top:auto;
+    height:72vh;width:100%;
+    background:var(--cream);
+    border-radius:20px 20px 0 0;
+    box-shadow:0 -10px 30px rgba(0,0,0,0.35);
+    z-index:20;
+    transform:translateY(100%);
+    transition:transform .3s ease;
+  }
+  body.list-open .list-drawer{ transform:translateY(0); }
+}
+
+.drawer-handle{ display:none; }
+@media (max-width:860px){
+  .drawer-handle{
+    display:flex;justify-content:center;padding:10px 0 4px 0;flex:0 0 auto;
+  }
+  .handle-bar{width:38px;height:4px;border-radius:3px;background:var(--line);}
+}
+
+.mobile-tab{
+  display:none;
+}
+@media (max-width:860px){
+  .mobile-tab{
+    display:flex;align-items:center;justify-content:center;
+    position:absolute;bottom:16px;left:50%;transform:translateX(-50%);
+    z-index:30;
+    width:44px;height:44px;border-radius:50%;
+    background:var(--butter);color:#fff;border:none;cursor:pointer;
+    box-shadow:0 6px 18px rgba(0,0,0,0.35);
+    transition:transform .25s ease;
+  }
+  .mobile-tab svg{width:20px;height:20px;transition:transform .25s ease;}
+  body.list-open .mobile-tab{ transform:translateX(-50%) rotate(180deg); }
+}
+
+.brand{
+  padding:26px 24px 18px 24px;
+  border-bottom:1px solid var(--line);
+  position:relative;
+}
+.brand .eyebrow{
+  font-family:'Fredoka',sans-serif;font-weight:600;
+  font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--cherry);margin-bottom:6px;
+}
+.brand h1{
+  font-family:'Baloo 2',cursive;
+  font-weight:800;
+  font-size:24px;line-height:1.15;margin:0 0 8px 0;
+  letter-spacing:-0.01em;
+  color:var(--ink);
+  text-shadow:1.5px 1.5px 0 rgba(217,142,59,0.35);
+  white-space:nowrap;
+}
+.brand h1 span{color:var(--butter);}
+.brand p{margin:0;color:var(--muted);font-size:13px;line-height:1.5;max-width:32ch;}
+
+/* theme toggle */
+.theme-toggle{
+  position:absolute;top:26px;right:24px;
+  display:flex;align-items:center;gap:2px;
+  background:var(--ink-soft);border:1px solid var(--line);
+  border-radius:20px;padding:3px;
+}
+.theme-toggle button{
+  width:30px;height:30px;border-radius:50%;border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  background:transparent;color:var(--muted);
+  transition:background .2s,color .2s;
+}
+.theme-toggle button.active{background:var(--butter);color:#fff;}
+.theme-toggle svg{width:16px;height:16px;}
+
+.stats-row{
+  display:flex;gap:0;border-bottom:1px solid var(--line);
+}
+.stat{
+  flex:1;padding:14px 12px;text-align:center;
+  border-right:1px solid var(--line);
+}
+.stat:last-child{border-right:none;}
+.stat .num{
+  font-family:'Fredoka',sans-serif;font-weight:700;font-size:20px;color:var(--cherry);
+}
+.stat .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-top:2px;}
+
+.controls{
+  padding:14px 24px;border-bottom:1px solid var(--line);
+  display:flex;gap:10px;flex-wrap:wrap;
+}
+.controls select, .controls input{
+  background:var(--ink-soft);
+  border:1px solid var(--line);
+  color:var(--ink);
+  font-family:'Nunito',sans-serif;
+  font-size:13px;
+  padding:8px 10px;
+  border-radius:8px;
+  flex:1;
+  min-width:110px;
+}
+
+.add-btn-wrap{padding:0 24px 14px 24px;border-bottom:1px solid var(--line);}
+.add-btn{
+  width:100%;padding:11px;border:none;border-radius:10px;cursor:pointer;
+  background:var(--butter);color:#fff;
+  font-family:'Fredoka',sans-serif;font-weight:600;font-size:14px;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  transition:transform .12s, filter .12s;
+}
+.add-btn:hover{filter:brightness(1.08);}
+.add-btn:active{transform:scale(0.98);}
+
+.list{
+  flex:1;overflow-y:auto;padding:8px 0;
+}
+.list::-webkit-scrollbar{width:6px;}
+.list::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px;}
+
+.row{
+  display:flex;align-items:center;gap:12px;
+  padding:11px 24px;
+  cursor:pointer;
+  border-bottom:1px solid var(--line);
+  transition:background .15s;
+}
+.row:hover{background:var(--ink-soft);}
+.row.active{background:var(--ink-soft);border-left:3px solid var(--butter);padding-left:21px;}
+
+.row-text{flex:1;min-width:0;}
+.row-text .name{font-weight:700;font-size:14px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.row-text .loc{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+.edit-btn{
+  flex:0 0 auto;width:26px;height:26px;border-radius:50%;border:none;
+  background:transparent;color:var(--muted);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;transition:opacity .15s, background .15s, color .15s;
+}
+.edit-btn svg{width:14px;height:14px;}
+.row:hover .edit-btn{opacity:1;}
+.edit-btn:hover{background:var(--butter);color:#fff;}
+
+.footer-note{
+  padding:12px 24px;font-size:10.5px;color:var(--muted);
+  border-top:1px solid var(--line);font-family:'Fredoka',sans-serif;
+  letter-spacing:.03em;
+}
+
+/* ---------- COOKIE MARKERS (shared look for map pins + sidebar stamps) ---------- */
+.cookie-face{
+  position:relative;
+  border-radius:50%;
+  flex:0 0 auto;
+  background:
+    radial-gradient(circle at 26% 30%, #4A2C14 6%, transparent 7%),
+    radial-gradient(circle at 62% 22%, #4A2C14 7%, transparent 8%),
+    radial-gradient(circle at 78% 58%, #4A2C14 6%, transparent 7%),
+    radial-gradient(circle at 42% 70%, #4A2C14 7%, transparent 8%),
+    radial-gradient(circle at 18% 64%, #4A2C14 5%, transparent 6%),
+    radial-gradient(circle at 55% 46%, #4A2C14 6%, transparent 7%),
+    radial-gradient(circle at 32% 30%, rgba(255,255,255,0.45), transparent 50%),
+    #E3B579;
+  box-shadow:0 1px 3px rgba(0,0,0,0.35), inset 0 -2px 3px rgba(74,44,20,0.3);
+  border:1.5px solid #C98A42;
+  transition:transform .18s cubic-bezier(.34,1.56,.64,1), box-shadow .18s ease;
+  cursor:pointer;
+}
+.cookie-face:hover{
+  transform:scale(1.22);
+  box-shadow:0 6px 14px rgba(0,0,0,0.5), inset 0 -2px 3px rgba(74,44,20,0.3);
+  z-index:50;
+}
+.cookie-badge{
+  position:absolute;
+  right:-5px;bottom:-5px;
+  min-width:20px;height:20px;padding:0 4px;
+  border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Fredoka',sans-serif;font-weight:700;font-size:10.5px;
+  color:#FFF8EC;
+  border:1.5px solid #FFF8EC;
+}
+
+/* ---------- MAP ---------- */
+#map{width:100%;height:100vh;background:#5C4326;position:relative;}
+.leaflet-tile-pane{ filter: var(--map-filter); transition:filter .3s; }
+.map-water-tint{
+  position:absolute;inset:0;z-index:399;pointer-events:none;
+  background:transparent;
+}
+
+.leaflet-popup-content-wrapper{
+  background:var(--cream);color:var(--ink);border-radius:14px;
+  font-family:'Nunito',sans-serif;
+}
+.leaflet-popup-tip{background:var(--cream);}
+.leaflet-popup-close-button{color:var(--muted) !important;}
+.popup-inner{max-width:270px;}
+.popup-inner .p-name{font-family:'Baloo 2',cursive;font-weight:700;font-size:20px;margin:0 0 2px 0;}
+.popup-inner .p-loc{font-size:12px;color:var(--muted);margin-bottom:8px;}
+.popup-inner .p-score{
+  display:inline-block;font-family:'Fredoka',sans-serif;font-weight:600;
+  font-size:13px;padding:2px 8px;border-radius:20px;margin-bottom:8px;
+}
+.popup-inner .p-grid{font-size:12px;line-height:1.5;margin-top:6px;}
+.popup-inner .p-grid b{color:var(--cherry);}
+.popup-inner .p-comment{
+  margin-top:8px;padding-top:8px;border-top:1px solid var(--line);
+  font-size:12px;font-style:italic;color:var(--muted);line-height:1.4;
+}
+.popup-inner .p-directions{
+  margin-top:10px;padding-top:10px;border-top:1px solid var(--line);
+  display:flex;flex-direction:column;gap:6px;
+}
+.popup-inner .dir-input{
+  width:100%;padding:7px 9px;border-radius:7px;border:1px solid var(--line);
+  font-family:'Nunito',sans-serif;font-size:12px;background:var(--ink-soft);color:var(--ink);
+}
+.popup-inner .dir-btn{
+  width:100%;padding:8px;border:none;border-radius:8px;cursor:pointer;
+  background:var(--cherry);color:#fff;
+  font-family:'Fredoka',sans-serif;font-weight:600;font-size:12.5px;
+  transition:filter .15s;
+}
+.popup-inner .dir-btn:hover{filter:brightness(1.08);}
+
+/* ---------- ADD-COOKIE MODAL ---------- */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(20,12,5,0.55);
+  display:none;align-items:center;justify-content:center;z-index:1000;
+  padding:20px;
+}
+.modal-overlay.open{display:flex;}
+.modal{
+  background:var(--cream);color:var(--ink);border-radius:16px;
+  width:100%;max-width:440px;max-height:88vh;overflow-y:auto;
+  padding:26px 26px 22px 26px;
+  box-shadow:0 20px 50px rgba(0,0,0,0.4);
+}
+.modal h2{font-family:'Baloo 2',cursive;font-size:26px;margin:0 0 4px 0;}
+.modal .sub{font-size:12.5px;color:var(--muted);margin:0 0 18px 0;}
+.field{margin-bottom:12px;}
+.field label{display:block;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:5px;}
+.field input, .field textarea{
+  width:100%;background:var(--ink-soft);border:1px solid var(--line);color:var(--ink);
+  border-radius:8px;padding:9px 10px;font-family:'Nunito',sans-serif;font-size:13.5px;
+}
+.field textarea{resize:vertical;min-height:50px;}
+.field-row{display:flex;gap:10px;}
+.field-row .field{flex:1;}
+.modal-actions{display:flex;gap:10px;margin-top:18px;}
+.modal-actions button{
+  flex:1;padding:11px;border-radius:10px;border:none;cursor:pointer;
+  font-family:'Fredoka',sans-serif;font-weight:600;font-size:14px;
+}
+.btn-primary{background:var(--butter);color:#fff;}
+.btn-secondary{background:var(--ink-soft);color:var(--ink);}
+.form-msg{font-size:12px;margin-top:8px;color:var(--cherry);min-height:14px;}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="sidebar">
+    <div class="brand">
+      <h1>GG'S <span>COOKIE QUEST</span></h1>
+      <p>Cookies rated on thickness, radius, bake, base &amp; chocolate ratio.</p>
+
+      <div class="theme-toggle" id="themeToggle">
+        <button id="lightBtn" title="Light mode" aria-label="Light mode">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><line x1="12" y1="1.5" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22.5"/><line x1="4.2" y1="4.2" x2="5.9" y2="5.9"/><line x1="18.1" y1="18.1" x2="19.8" y2="19.8"/><line x1="1.5" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22.5" y2="12"/><line x1="4.2" y1="19.8" x2="5.9" y2="18.1"/><line x1="18.1" y1="5.9" x2="19.8" y2="4.2"/></svg>
+        </button>
+        <button id="darkBtn" title="Dark mode" aria-label="Dark mode">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="stats-row" id="statsRow"></div>
+
+    <div class="controls">
+      <input type="text" id="searchBox" placeholder="Search a spot…">
+      <select id="citySelect">
+        <option value="all">All Cities</option>
+      </select>
+      <select id="sortSelect">
+        <option value="score-desc">Score: High → Low</option>
+        <option value="score-asc">Score: Low → High</option>
+        <option value="name-asc">Name: A → Z</option>
+      </select>
+    </div>
+
+    <div class="list-drawer">
+      <div class="drawer-handle" id="drawerHandle">
+        <div class="handle-bar"></div>
+      </div>
+
+      <div class="list" id="list"></div>
+
+      <div class="footer-note">RUBRIC: THICKNESS · RADIUS · BAKE · BASE · CHOCOLATE RATIO</div>
+    </div>
+  </div>
+
+  <div id="map"><div class="map-water-tint" id="mapTint"></div></div>
+  <button class="mobile-tab" id="mobileTab" aria-label="Show list">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+  </button>
+</div>
+
+<script>
+const BASE_DATA = [{"name": "Tatte", "location": "Tatte Harvard Square", "city": "Boston / Cambridge", "score": 4.8, "thickness": "A bit thin for my liking", "radius": "Good radius", "bake": "Would have liked less baked, edges were too crispy for my liking", "base": "too grainy", "chocolate": "decent ratio", "comments": "Honestly was really dissapointed in this cookie based on my prior tatte experience, stick with savory goods", "lat": 42.3726069, "lon": -71.1169656}, {"name": "Crumbl", "location": "Crumbl Boston", "city": "Boston / Cambridge", "score": 9.1, "thickness": "SO THICK", "radius": "absolutely amazing, so big", "bake": "Amazingly underbaked, middle was gooey with the outer layer backed, but not too crispy", "base": "Maybe lacking in flavor a tiny bit, but still great overall", "chocolate": "good ratio, nothing standing out though", "comments": "A great cookie. Size really does matter and Crumbl delivered. Would go back again just for this cookie, but also to try other flavors. I took off points because I had to drive to crumbl", "lat": 42.3564497, "lon": -71.1427765}, {"name": "Forge", "location": "Forge Bakery", "city": "Boston / Cambridge", "score": 7.8, "thickness": "Not super thick, but fits the vibe", "radius": "good size, could have been bigger", "bake": "Very good, I personally like my cookies raw in the middle but this was still very excellent", "base": "A bit too grainy, salty though which I appreciate", "chocolate": "depended on the bite, the first few bites I had were not great, but the second half was perfect", "comments": "Very good, I think for the average cookie consumer this would be one too love. I really did like it, but I also like my cookies a bit thiccer and underbaked", "lat": 42.3838224, "lon": -71.1108423}, {"name": "Insomnia", "location": "Insomia Cookies Harvard Square", "city": "Boston / Cambridge", "score": 6.0, "thickness": "would have enjoyed thicker", "radius": "alright", "bake": "loved the crispness of the putside ratio to the underbake of the inside.", "base": "very good, could use more salt", "chocolate": "couk use some more chocoloate chops", "comments": "I'm not quite sure how insomia does it, but they manage to really get a perfect bake. The cripiness on the outside perfectly matches the underbake on the inside - i could just use a few more chocolate chips.", "lat": 42.3720079, "lon": -71.1180151}, {"name": "Flour", "location": "Flour Harvard Square", "city": "Boston / Cambridge", "score": 7.9, "thickness": "Lacking", "radius": "very good", "bake": "For a thin cookie I am very satisfied. The outside has a great crispness without the cookie feeling burnt in any way. The cookie is still soft in the middle despite the cookie being so thin", "base": "Flour really nailed the taste here - I could each one of these cookies plain without the chocolate chips", "chocolate": "I really enjoyed the type of chips that were used - very thick, but I would have like to have had more of a spread throughout the cookie", "comments": "The taste of the base is really what saves the cookie here. I am personally a fan of cookies that have bases with a hint of saltiness and that's exactly what Flour did. Like I said, I could have enjoyed this cookie with just the base itself, but because I was expecting a chocolate chip cookie, I could have used more chocolate. With the excpetion of this cookie being paper thin, a very well made treat", "lat": 42.373041799999996, "lon": -71.1224076}, {"name": "Mike's", "location": "Mike's Pastries Harvard Square", "city": "Boston / Cambridge", "score": 6.7, "thickness": "really nice job here", "radius": "perfect", "bake": "Really soft throughout the whole cookie - i like that kind of consistency. Very airy which is different... wouldn't say good or bad (except for the fact that it makes for less actual cookie)", "base": "alright, could have used a pinch of salt", "chocolate": "they used mini chocolate chips.... I just wanna know why", "comments": "honestly the only things really saving this cookie are its bake and size. Who thinks mini chocolate chips are a good idea???", "lat": 42.373008899999995, "lon": -71.11908249999999}, {"name": "Pavement", "location": "Pavement Coffee Harvard Square", "city": "Boston / Cambridge", "score": 4.2, "thickness": "good", "radius": "good", "bake": "Okay so this cookie was superrrrrr dry. The middle did it a little bit of justice, but the edges were almost inedible", "base": "like, fine.... it grew on me as I ate it", "chocolate": "I did like the chunks of chocolate used", "comments": "So like I said before, the edges were almost inedible. I was actually going to give it a lower score (like a 3.8) but the middle allowed this cookie to gain some points back. Just like, if I can't actually eat the whole cookie, then there's not really much else that can be going for it no matter how good the rest of it is", "lat": 42.3730684, "lon": -71.1187188}, {"name": "Burdicks", "location": "L.A. Burdicks Harvard Square", "city": "Boston / Cambridge", "score": 8.9, "thickness": "a little small, but honestly would be overwhelming if any biggger because the chocolate is so rich", "radius": "good", "bake": "Nice and soft really no complaints here, very very tasty", "base": "very very tasty", "chocolate": "amazing, sooooo much chocolate", "comments": "such a delivious cookie! For someone who loves chocolate as much as me this was a dream - very very solid cookie. Also had like a brownie thing in the middle? Kind of a lot for me but very delicious", "lat": 42.3744507, "lon": -71.1220462}, {"name": "Pete's", "location": "Pete's Coffee Harvard Square", "city": "Boston / Cambridge", "score": 9.4, "thickness": "very decent", "radius": "amazing", "bake": "crispy edges and soft middle, what I love in a cookie", "base": "I questioned at first but grew to love it", "chocolate": "Sooooo good", "comments": "I honestly did not have high expections for this cookie and the cookie absolutely prevailed. This is my ideal cookie. Thank you, Pete's. \"I can taste the baking soda\" - Owen", "lat": 42.372628, "lon": -71.120586}, {"name": "Honeycomb", "location": "Honeycomb Creamery", "city": "Boston / Cambridge", "score": 5.2, "thickness": "Got the job done", "radius": "Decent", "bake": "\"Bread\" -owen", "base": "Is this where bready should go", "chocolate": "like, fine?", "comments": "Not a gerat cookie in my opinion, but Oliver made the point that the bready feature may go well with ice cream - and this cookie did come from an ice cream stop. Maybe next time an ice cream sandwich should be made, but definitely would not eat on its own agan.", "lat": 42.3831883, "lon": -71.1197993}, {"name": "JP Lick's", "location": "JP Lick's Harvard Square", "city": "Boston / Cambridge", "score": 8.5, "thickness": "Works for me", "radius": "On the smaller side?", "bake": "Dense. If it were slightly more moist, I would have given it a 10.", "base": "Could have been slightly smoother, but I couldn't have done better myself.", "chocolate": "Perfect", "comments": "This choco ratio is kind insane - would def reccomend for a cookie", "lat": 42.3728668, "lon": -71.1175184}, {"name": "Bagelsaurus", "location": "Bagelsaurus", "city": "Boston / Cambridge", "score": 8.2, "thickness": "Very thin", "radius": "Very nice", "bake": "Very soft for an oatmeal cookie - I'm satisfied", "base": "Oatmeal base, I liked", "chocolate": "Oh yes for me but another person got a worse bite", "comments": "Best chocolate I've had so far. Was an oatmeal cookies which was different but I liked it. Not a very homogenous chocolate ratio, but I had lots of chocolate so was very happy. Nat would have liked it to be more cakey. Alison wished it was more sense. Did fall apart a bit, but again it was an oatmeal cookie", "lat": 42.386028599999996, "lon": -71.1195879}, {"name": "Market", "location": "Harvard Square", "city": "Boston / Cambridge", "score": 6.9, "thickness": "Good", "radius": "Great", "bake": "A little to crunchy on the edges for my liking, took baked overall", "base": "I will say, the taste was good, just way too baked", "chocolate": "Actually very great, they also used diffferent types of chocolate", "comments": "Kind of reminded me of an upscale gas station cookie. Not bad, would eat again if in the vicinity, but would not go out of my way to get this one", "lat": 42.372988899999996, "lon": -71.12090239999999}, {"name": "Oggi", "location": "30 Dunster St, Cambridge, MA 02138", "city": "Boston / Cambridge", "score": 9.6, "thickness": "Thinner side of amazing", "radius": "Perf", "bake": "The inside is quite underbaked, which I love and the outside had the perfect amount of crisp. Spot on I would say", "base": "Exactly what I want for my chocolate chip cookie, the touch of salt really did the trick", "chocolate": "Best ratio so far", "comments": "Would definitely return for this cookie, I think the only thing that would make it better were if it were put in a microwave for approximately 6 seconds", "lat": 42.3724541, "lon": -71.119112}, {"name": "Berryline", "location": "Berryline Harvard Square", "city": "Boston / Cambridge", "score": 5.2, "thickness": "Quite thin", "radius": "Eh", "bake": "Super dry, making it way too crunch for my liking", "base": "It was actually a chocolate base, which I was not opposed to, but I think I prefer the more traditional chocolate chip cookie base", "chocolate": "Again, it was a chocolate base so there was plenty of chocolate", "comments": "It kind of seemed like the cookie had been sitting in that jar for 6 months (which it may have been, because who goes to berryline for a cookie) so I think berryline should stick to frozen treats", "lat": 42.3711973, "lon": -71.1145861}, {"name": "Dave's Fresh Pasta", "location": "Dave's Fresh Pasta", "city": "Boston / Cambridge", "score": 9.4, "thickness": "Not thick but not bad", "radius": "Amazing", "bake": "Like literally perfect", "base": "So so delicious", "chocolate": "Amazing, chocolate chips were very sweet though", "comments": "", "lat": 42.3987646, "lon": -71.1241386}, {"name": "Whole Foods downtown", "location": "Whole Foods Downtown Miami", "city": "Miami", "score": 7.6, "thickness": "alright", "radius": "Very nice, just the right amount", "bake": "Very crispy on the outside and a decent goo on the inside.", "base": "Not too much flavor, which is better than a bad taste but could use some more salt", "chocolate": "A good amount, not disappointed", "comments": "The cookie was a little too sweet for my liking - which is surprising because I love sweet things. Would have definitely preferred more salt.", "lat": 25.7719548, "lon": -80.1891315}, {"name": "BK Office Cookie", "location": "5707 Waterford District Dr.", "city": "Miami", "score": 8.3, "thickness": "For a small cookie, not bad", "radius": "A bit on the small side, but its BK so impressive honestly", "bake": "So perfect, crispy outside and melty inside that I really haven't seen in another cookie", "base": "I can always use more salt, but I love this", "chocolate": "Pretty good and SOOOOO melty", "comments": "I feel like I'm probably a little biased in giving this cookie a higher score because it is a huge highlight in my workday. It's small and gets the job done as a great 2pm \"pick me up.\" Cookie cart lady - ily", "lat": 25.78273, "lon": -80.2897401}, {"name": "The Blakery", "location": "Time Out Market Miami", "city": "Miami", "score": 7.7, "thickness": "Very good", "radius": "Also good", "bake": "Very crispy outside, very underbaked inside - just to my liking", "base": "I can taste the salt!! Actually loved this", "chocolate": "Small chocolate chips but lots of them! Also had a brownie in the middle so more chocolate", "comments": "They were out of the regular chocolate chip, so this was a brownie chocolate chip. Still what I would expect their chocolate chip cookie to be like though (minus the brown in the middle) an above average cookie", "lat": 25.7891798, "lon": -80.1328119}, {"name": "Pura Vida", "location": "Pura Vida Brickell", "city": "Miami", "score": 5.5, "thickness": "Nothing to stand out", "radius": "Biggest in Miami yet!!", "bake": "Baked throughout - I think the crispness on the edges", "base": "This is a vegan cookie, so it's quite grainy. Not too sweet though and every once in a while I get a nice salty bite", "chocolate": "", "comments": "Overall, not a bad cookie. Just a little to \"healthy\" for me. You could tell there was no egg based on how grainy it was and there was not an even flavor throughout. I can see an occasion where I would crave this, but would definitely not be my go-to cookie", "lat": 25.7668361, "lon": -80.1895583}, {"name": "Publix", "location": "Publix Brickell", "city": "Miami", "score": 7.5, "thickness": "Gigantic", "radius": "Very normal", "bake": "Cooked throughly, but not overdone", "base": "Very plain, could've used so salt but went well with the sweetness of the chips", "chocolate": "Most I've ever seen on a cookie", "comments": "This was a very quality grocery store cookie with an insane amount of chocolate chips at a great price point ($2.30) would come back again if I needed a pick me up", "lat": 25.761162799999997, "lon": -80.19665839999999}, {"name": "Honey Veil", "location": "Honey Veil Bakery", "city": "Miami", "score": 7.3, "thickness": "Good!", "radius": "thicker than usually", "bake": "crip outside, soft middle", "base": "It's good but not much flavor, needs more sweetness or salt or something", "chocolate": "The chocolate is so melty which a like, good flavor", "comments": "I love the bake of the cookie, the taste is just nothing spectacular. I think it might be sourdough which is cool!", "lat": 25.704176, "lon": -80.2862794}, {"name": "PuroRoast", "location": "Puro Roast Brickell", "city": "Miami", "score": 7.9, "thickness": "Great size", "radius": "Very thick!", "bake": "Sooooo gooey but not very crispy", "base": "Very cakey taste, but a good flavor", "chocolate": "Chocolate is great, this cookie could use a bit more salt though", "comments": "A very very cakey cookie. Honestly liked it but really have to be in the mod for something dense", "lat": 25.7676963, "lon": -80.19345849999999}, {"name": "The Heyday", "location": "The Citadel Little River (The Heyday)", "city": "Miami", "score": 7.2, "thickness": "Small for price but good enough to satisfy", "radius": "eh", "bake": "Not my favorite texture, would prefer gooey inside and crispier outside", "base": "Flavor here is the savior. Perffff amount of salt", "chocolate": "Chocolate has a weird taste when microwaved, that may be my fault.", "comments": "This cookie is being eaten a few days after we bought them, so may have been better in the moment. Colin's reecipee apparently", "lat": 26.0106263, "lon": -80.1471105}, {"name": "Caf\u008e Bastille", "location": "Caf\u008e Bastille Miami", "city": "Miami", "score": 3.5, "thickness": "Very large", "radius": "decent", "bake": "Texture is alright but nothing standout", "base": "Cookie litereally tastes like play dough without getting the chocolate in a bite", "chocolate": "Chocolate is decent, there's also walnuts but they are not adding anything", "comments": "Really not a fan of this cookie, walnut flavor is too much, base is not good. The only redeeming factor is the chocolate and consistency. Though looks", "lat": 25.7733642, "lon": -80.1893597}, {"name": "Club Space", "location": "Club Space", "city": "Miami", "score": 9.2, "thickness": "Smaller but perf for the occasion", "radius": "For its radius, great thickness", "bake": "Bake really blew me away (in a good way) considering the venue", "base": "A salty cookie, but that's also good for this venue", "chocolate": "Chocolate here was fantastic", "comments": "The only thing was that this cookie was $10, but it was crazy delicious. Hopefully it doesn't have drugs in it", "lat": 25.784654600000003, "lon": -80.1931826}, {"name": "Fireman Derek's Bake Shop", "location": "Fireman Derek's Bake Shop Wynwood", "city": "Miami", "score": 7.2, "thickness": "She's a lil voluptuous", "radius": "Like the size of my head", "bake": "A nice and crisp outside, the center is quite bready though which is bringing this down", "base": "It's a little bland, but bit in a bad way. Could use more sea salt", "chocolate": "Really really nice, semi sweet I think", "comments": "So this cookie is MASSIVE but I don't love the bake. Taste is decent but nothing standout. Their cake though - AMAZING. And guava cookie might be the best thing I've ever put in my mouth", "lat": 25.8015266, "lon": -80.19487649999999}, {"name": "Zak the Baker", "location": "Zak the Baker", "city": "Miami", "score": 8.6, "thickness": "A nice thicc boi", "radius": "thumbs up!", "bake": "What differentiates this cookie is its really nice, crisp outside", "base": "This cookie was not super sweet! I actually LOVED it though. A bit grainy, but in a way that seemed more salty which I liked", "chocolate": "I really liked the chocolate pieces in here", "comments": "Best cookie I've had in Miami (so far) and it definitely stands out from the rest due to the fact that it is not too sweet. Their other food looks delicious too!", "lat": 25.8016024, "lon": -80.20096029999999}, {"name": "Night Owl's", "location": "Night Owl Brickell", "city": "Miami", "score": 7.5, "thickness": "Very good", "radius": "Nice", "bake": "So good, crispy outside and very underbaked inside", "base": "Not bad, could use more salt", "chocolate": "Insane", "comments": "I just wished they used semi sweet chocolate chips and maybe higher quality. The other cookies were much better", "lat": 25.8009386, "lon": -80.1982874}, {"name": "Cr\u008fme", "location": "Cr\u008fme London Soho", "city": "London, UK", "score": 8.5, "thickness": "Chef 's Kiss", "radius": "Perfection", "bake": "", "base": "", "chocolate": "", "comments": "", "lat": 51.5148817, "lon": -0.1354869}, {"name": "Gail's", "location": "Gail's Beaconsfield", "city": "London, UK", "score": 7.0, "thickness": "Decent thickness, very dense", "radius": "A good size", "bake": "Like I said, quite dense but not crunchy. Could be softer for my liking", "base": "Not sweet at all. I like that you can taste the salt, a little to unsweet for my liking though (that's a first)", "chocolate": "VERY GOOD", "comments": "this is the cookie for someone that doesn't like it too sweet. Loooiovvveeddd the chocolate ratio", "lat": 51.609352099999995, "lon": -0.6449079999999999}, {"name": "Funny Face Bakery", "location": "Funny Face Rockerfeller Center", "city": "New York City", "score": 8.0, "thickness": "Almost too thick", "radius": "Perf", "bake": "I like - very crispy edge and soft I terior", "base": "Has a very nice salt punch", "chocolate": "So much omg", "comments": "I really like this cookie base. There are a lot of chocolate chips which I like, but they are a little too sweet for me. Could have used a mix of semi sweet of dark", "lat": 40.725290699999995, "lon": -73.99493989999999}, {"name": "Suzi licious", "location": "Whole Foods Downtown Miami", "city": "Miami", "score": 7.0, "thickness": "Not super thick", "radius": "small, but snacklike", "bake": "crispy and chewy", "base": "I liked the saltiness of the base, not super sweet", "chocolate": "semi-sweet, which I like - for a small cookie was good, wouldn't hurt to have more", "comments": "For a grocery store \"more health concious\" cookie - definitely a solid choice", "lat": 25.7719548, "lon": -80.1891315}, {"name": "Seven Grams", "location": "Seven Grams NYC", "city": "New York City", "score": 8.6, "thickness": "Perfect Size cookie", "radius": "Perfection", "bake": "Very airy and thick, manages to stay light", "base": "High quality chocolate, big chunks but a little bit on the sweet side", "chocolate": "AMAZING", "comments": "I LOVE the bite of this cooke (mouthfeel) it looks like the chocolate is literally layered in which is something I've never seen before", "lat": 40.779958900000004, "lon": -73.9802984}, {"name": "Costa Coffee", "location": "Doha Airport", "city": "Doha, Qatar", "score": 6.3, "thickness": "A great size", "radius": "Decently thicks", "bake": "Texture is basically bread, not crunch of gooeyness", "base": "Base as a great cookie taste", "chocolate": "Chocolate is alright, nothing standout", "comments": "This cookie has probably been siting there for hours and idk what else I would expect at an airport. Did the job that was needed of it though", "lat": 25.2698514, "lon": 51.602698399999994}, {"name": "Leaving Two Chocolate", "location": "Leaving Two Chocolate NYC", "city": "New York City", "score": 8.3, "thickness": "Good size", "radius": "SO THICK like unrealistic thick", "bake": "The crisp outside it's nice with a gooey inside", "base": "I honestly love the flavor of the bake", "chocolate": "The chocoalte is a little too much for me, wayyyy to sweet", "comments": "Levain makes some insanely thick cookies with an amazing base flavor. The chocolate here is a bit too much compared with their signature chocolate chip walnut. I'd go back and buy that maybe not this.", "lat": 40.779958900000004, "lon": -73.9802984}, {"name": "El Diejo Cafe", "location": "El Diejo Caf\u008e Antigua, Guatemala", "city": "Antigua, Guatemala", "score": 2.2, "thickness": "Sort of thin", "radius": "Decent size", "bake": "Mass produced, came in plastic", "base": "Extremely grainy, pretty much falls apart in hand", "chocolate": "Doing nothing", "comments": "Not great, came in plastic, mass produced. Might be good with a coffee since it is from a coffee shop.", "lat": 14.5583571, "lon": -90.73535410000001}, {"name": "Cortado", "location": "Cortado Brickell", "city": "Miami", "score": 8.2, "thickness": "Regular", "radius": "Regular size", "bake": "Great", "base": "Lots of flavor, little grainy. Flaky sea salt - haven't gotten that in a while", "chocolate": "Definitely high quality, a little sweet but not overpowering", "comments": "Really good basic pick-me-up cookie. Nothing huge and over the top - can eat in one sitting without being overwhelmed. High quality.", "lat": 25.7656307, "lon": -80.19110429999999}, {"name": "The Daily", "location": "2001 Biscayne Blvd #109, Miami, FL 33137", "city": "Miami", "score": 5.8, "thickness": "Average", "radius": "Large", "bake": "Base was a bit stale", "base": "Stale, lacked flavor - needed to be softer (maybe heated up) and have some salt", "chocolate": "Very sweet milk chocolate - all you could taste", "comments": "All I could taste was overly sweet milk chocolate. Salted caramel cookie is fire though.", "lat": 25.795711599999997, "lon": -80.1886802}, {"name": "Ted's Bulletin", "location": "Ted's Bulletin Washington DC", "city": "Washington, DC", "score": 9.4, "thickness": "Nice and thick", "radius": "Very good size", "bake": "Chewy with some crisp on outside", "base": "AWESOME flavor, could just use some flaky sea salt", "chocolate": "Chef's kiss flavor, great ratio, high quality", "comments": "So satisfied with this cookie - love the mouthfeel and flavor! Would go back for this cookie.", "lat": 38.9146882, "lon": -77.0321529}, {"name": "Flour and Weirdough", "location": "Flour and Weirdough", "city": "Miami", "score": 9.0, "thickness": "Good amount of girth", "radius": "Nice size", "bake": "Could use crispier outside", "base": "Not very sweet (a fan), could use more salt, a bit grainy", "chocolate": "Obviously very high quality", "comments": "Love this cookie. Only thing that would make it better is a bit more salt and crispier outside.", "lat": 25.699624099999998, "lon": -80.1627654}, {"name": "Millie's", "location": "Millie's Aberdeen, Scotland", "city": "Aberdeen, Scotland", "score": 7.7, "thickness": "Very thin", "radius": "Very average size", "bake": "Good", "base": "Packed with flavor, honestly a nice surprise", "chocolate": "Quite sweet but tastes way better than American chocolate", "comments": "Small cookie in a stand in a small shopping center was PACKED with flavor. A very good pick me up after a sad morning when Cosme left.", "lat": 57.1480235, "lon": -2.1004035}, {"name": "Lolita", "location": "Lolita Miami", "city": "Miami", "score": 8.0, "thickness": "Might be the thickest so far!", "radius": "A big boi", "bake": "Almost underbaked in center, would prefer crispier outside", "base": "Surprisingly great flavor for a cookie of this size", "chocolate": "Surprisingly good", "comments": "More like a cookie skillet, but great flavor. Coffee from this place though \u00f0\u009f\u00a4\u00ae", "lat": 25.764271700000002, "lon": -80.1934058}, {"name": "Maman", "location": "Maman Brickell", "city": "Miami", "score": 8.5, "thickness": "Thin", "radius": "Great radius", "bake": "Good", "base": "Very different base taste - sweet and light, almost nutty. Quite grainy which keeps it from 9 range", "chocolate": "VERY good", "comments": "Really like this cookie for a thinner one. A very elegant cookie which is appreciated!", "lat": 25.7663203, "lon": -80.1921986}, {"name": "Magnolias at the Mill", "location": "Magnolias at the Mill", "city": "Charleston, SC", "score": 6.5, "thickness": "", "radius": "", "bake": "", "base": "", "chocolate": "", "comments": "", "lat": 32.7793212, "lon": -79.9273719}, {"name": "Blueprint Cookies", "location": "Blueprint Cookies Ft. Lauderdale", "city": "Fort Lauderdale", "score": 9.5, "thickness": "Chunky", "radius": "Not too big not too small", "bake": "Soft inside, could have slightly crispier outside", "base": "LOVE the flavor, not too sweet with great flaky sea salt", "chocolate": "SO good, plus a big chunk in the middle", "comments": "Cosme got me this cookie and it's delicious. Potentially best in Miami. I want to go back!!", "lat": 26.1357598, "lon": -80.1391683}, {"name": "Fox in the Snow", "location": "Fox in the Snow New Albany", "city": "Columbus, OH area", "score": 6.5, "thickness": "Thick", "radius": "Big size", "bake": "Good", "base": "Okay but nothing special, quite grainy and not soft at all", "chocolate": "Tasty!", "comments": "Cookie was too grainy for me, but a decent taste - nothing special.", "lat": 40.0804816, "lon": -82.8135389}, {"name": "Northstar Cafe", "location": "Northstar Caf\u008e Easton", "city": "Columbus, OH area", "score": 9.0, "thickness": "Thinner", "radius": "Humungous", "bake": "Very crisp outside but gooey inside - hard to do with such a thin cookie", "base": "Great flavor, can taste the salt with flaky salt on top", "chocolate": "Melty and great ratio", "comments": "FANTASTIC cookie! Would come back and want to try more!", "lat": 40.0488595, "lon": -82.9145917}, {"name": "Costco", "location": "Costco Doral FL", "city": "Miami", "score": 8.5, "thickness": "", "radius": "", "bake": "", "base": "", "chocolate": "", "comments": "", "lat": 25.7751135, "lon": -80.3217926}, {"name": "Fat and Weird", "location": "Fat and Weird Miami", "city": "Miami", "score": 7.5, "thickness": "So thick", "radius": "Not too intimidating", "bake": "Falls apart a little due to being air fried, real distinct cookie taste", "base": "Real distinct cookie taste which I appreciate a lot. Filled with caramel!", "chocolate": "Very sweet chips but pair nicely with the base", "comments": "Blew my mind once heated up - filled with caramel which makes it different but the chocolate chip base stole the show. SOOOO good!", "lat": 30.1949272, "lon": -85.6612181}, {"name": "GF Choco Chip", "location": "Miami, FL", "city": "Miami", "score": 7.2, "thickness": "Thick for small", "radius": "Smallish", "bake": "Good", "base": "GF so a bit crumbly but not too bad for GF! Love the taste", "chocolate": "Good quality", "comments": "Would eat this cookie again - it feels healthier!", "lat": 25.7617, "lon": -80.1918}, {"name": "Wawa", "location": "Wawa Miami, FL", "city": "Miami", "score": 8.0, "thickness": "Not crazy thick but not thin", "radius": "So big!", "bake": "Not as soft in middle but good crisp outside", "base": "So tasty! Great base", "chocolate": "Sweet but really good", "comments": "For a gas station, this cookie SLAPS. I'm impressed!", "lat": 25.748628, "lon": -80.30842249999999}, {"name": "Gideon's Bakehouse", "location": "Orlando, FL", "city": "Orlando, FL", "score": 6.5, "thickness": "AND THICK", "radius": "BIG", "bake": "Very soft, would like crispier outside", "base": "Good flavor", "chocolate": "OVERBEARING and TOO SWEET", "comments": "Obviously more for the looks but wooah is the chocolate sweet!", "lat": 28.5383, "lon": -81.3792}, {"name": "The Village Bakery", "location": "The Village Bakery Miami", "city": "Fort Lauderdale", "score": 8.2, "thickness": "Not thin but not thick", "radius": "Big radius", "bake": "Wish outside was a little crispier, but inside is perfect gooey", "base": "Good flavor, kind of weird aftertaste but not bad", "chocolate": "Incredible", "comments": "Really really like the cookie! Would come back.", "lat": 26.131755599999998, "lon": -80.10464929999999}, {"name": "La Mercerie", "location": "La Mercerie New York, NY", "city": "New York City", "score": 9.8, "thickness": "Thick not too thick", "radius": "Big not too big", "bake": "Super crispy outside with gooey inside", "base": "Amazing, nice and salty kind of caramel", "chocolate": "Superb, at least 2 different types", "comments": "I think best cookie I've had. I savored every bite!", "lat": 40.72014780000001, "lon": -74.0021708}, {"name": "Radio Bakery", "location": "Radio Bakery Brooklyn, NY", "city": "New York City", "score": 8.3, "thickness": "Thinner but nice and crisp", "radius": "Large radius", "bake": "Great", "base": "Good but wish there was a little more flavor", "chocolate": "Super good!", "comments": "Overall great cookie and great sandwiches!", "lat": 40.6750428, "lon": -73.9670442}, {"name": "Under the Mango Tree", "location": "Under the Mango Tree", "city": "Other", "score": 5.0, "thickness": "Not thin but not thick", "radius": "Small but not too small", "bake": "Very soft and cake-like, wish it was crispier", "base": "Tastes healthy", "chocolate": "", "comments": "Definitely a 'healthy' cookie - but not bad!", "lat": 18.1838987, "lon": 102.6631314}, {"name": "Cava", "location": "Cava Brickell", "city": "Miami", "score": 6.5, "thickness": "Fairly thin", "radius": "Decent", "bake": "Good", "base": "Oat base, good mix of sweet and salty - very good for a packaged cookie. Super crumbly", "chocolate": "Perfect sweetness", "comments": "Really great packaged cookie. Lost points for super crumbly base.", "lat": 25.765538199999998, "lon": -80.1899916}, {"name": "Ophelia", "location": "Ophelia Miami", "city": "Miami", "score": 8.9, "thickness": "Thin", "radius": "Big", "bake": "Soft interior and really nice crisp exterior", "base": "Could have more flavor, but not bad", "chocolate": "So melty, saving grace - layered in", "comments": "Amazing bake and love how the chocolate is layered in. Could just use a little more flavor in the base.", "lat": 25.7429207, "lon": -80.228847}, {"name": "Raccoon Coffee", "location": "Raccoon Coffee Brickell", "city": "Miami", "score": 8.4, "thickness": "Not too thin but not thick", "radius": "Good size", "bake": "Could be a little more gooey inside", "base": "Love the base taste", "chocolate": "Even better than the base!", "comments": "Cookie surprised me! Taste is spot on, chocolate is great, only downfall is the bake.", "lat": 25.7673544, "lon": -80.18850619999999}, {"name": "Ooey Cookie", "location": "Ooey Cookie Sao Paulo, Brazil", "city": "S\u00e3o Paulo, Brazil", "score": 9.5, "thickness": "Thick", "radius": "Small but thick", "bake": "Perfect - crispy outside, gooey middle", "base": "So unique in a good way, could use a touch more salt", "chocolate": "Superb", "comments": "Incredible - a very nice surprise in Sao Paulo! Guava cookie also great. The base is what makes these cookies and the bake is perfect!", "lat": -23.542401599999998, "lon": -46.653300599999994}, {"name": "The Wayfarer", "location": "The Wayfarer", "city": "Miami", "score": 7.5, "thickness": "Quite thin", "radius": "Big radius", "bake": "Crispier than expected, would have liked softer middle", "base": "Good flavor with lots of salt", "chocolate": "Very good!", "comments": "Good cookie - would have liked the middle to be softer, but the chocolate made up for some of the misses.", "lat": 25.7906, "lon": -80.13}, {"name": "Crumbl Semi Sweet", "location": "Crumbl Doral", "city": "Miami", "score": 8.7, "thickness": "Thick!!", "radius": "HUGE", "bake": "Could have crispier edges, but inside is perfectly soft and gooey", "base": "Could use a little more salt, but overall decent", "chocolate": "So good - melts in your mouth", "comments": "Way better than regular chocolate chip. Chocolate is amazing. Gooiness is perfect. Would go back for this cookie.", "lat": 25.769287, "lon": -80.3576813}, {"name": "Kookaburra", "location": "Kookaburra St. Augustine, FL", "city": "St. Augustine, FL", "score": 8.5, "thickness": "Thin", "radius": "Big", "bake": "Crisp but chewy", "base": "Awesome flavor, nice and salty", "chocolate": "Tastes great", "comments": "Loved this place in St. Augustine! And their cookie to go was awesome.", "lat": 29.8928117, "lon": -81.311845}, {"name": "The Coffee", "location": "The Coffee Wynwood", "city": "Miami", "score": 9.5, "thickness": "Pretty thick", "radius": "Big", "bake": "Sooooo gooey with a little crisp bite", "base": "Sooooo good - hint of vanilla that is delicious!!", "chocolate": "Honestly amazing, pretty sweet", "comments": "Said 'woah' when I tried this so had to give it a high score. Would 100% go back for this cookie.", "lat": 25.8019982, "lon": -80.1978711}, {"name": "Slice House", "location": "Slice House Miami", "city": "Miami", "score": 4.2, "thickness": "", "radius": "", "bake": "", "base": "Tastes very bready", "chocolate": "", "comments": "Tastes very bready.", "lat": 25.787697299999998, "lon": -80.19297329999999}, {"name": "Mr. Pickles", "location": "Mr. Pickles Oakley, CA", "city": "Oakley, CA", "score": 6.0, "thickness": "", "radius": "", "bake": "", "base": "", "chocolate": "", "comments": "Exactly like Subway.", "lat": 37.9980165, "lon": -121.71833729999999}, {"name": "Coney Burger", "location": "Coney Burger Miami", "city": "Miami", "score": 6.0, "thickness": "", "radius": "", "bake": "", "base": "", "chocolate": "", "comments": "Subway but much better.", "lat": 25.7873013, "lon": -80.1942519}, {"name": "Brulee Cookie", "location": "Sana Wynwood", "city": "Miami", "score": 8.1, "thickness": "Thic", "radius": "Smol", "bake": "Very soft but cooked, could use a little more crisp", "base": "Very strong cookie dough taste which I like", "chocolate": "Two different kinds, but delicious", "comments": "Got this for free when I went to Sana. Really tasty! Good treat for a bday.", "lat": 25.8001495, "lon": -80.1956843}, {"name": "Ben's Cookies", "location": "Ben's Cookies Bath, UK", "city": "Bath, UK", "score": 4.2, "thickness": "Not too thin", "radius": "Big", "bake": "Hard - most likely had been sitting out", "base": "Barely any flavor, just way too sweet", "chocolate": "Not nice, think cookie had been sitting out for a while", "comments": "Made my stomach hurt, would not have again.", "lat": 51.38208410000001, "lon": -2.3599937}, {"name": "Pret a Manger", "location": "Heathrow Airport, UK", "city": "London, UK", "score": 6.9, "thickness": "Good", "radius": "BIG", "bake": "Crispy edges, soft center. Kept in warm container which kept it more fresh", "base": "Kind of tastes like a croissant - I like it!", "chocolate": "Nice and melty", "comments": "Really enjoyed this cookie just passing through Heathrow. Would come back for it.", "lat": 51.4679903, "lon": -0.45504710000000004}, {"name": "Village Baking Co.", "location": "Village Baking Co. Dallas, TX", "city": "Dallas, TX", "score": 8.2, "thickness": "Good", "radius": "Good", "bake": "Crispy edges but still fairly soft center", "base": "Good tasting soft base, kind of salty", "chocolate": "Delicious - really raising the bar", "comments": "", "lat": 32.8233557, "lon": -96.78987430000001}, {"name": "Frankie and Wally's", "location": "Frankie and Wally's Miami", "city": "Miami", "score": 6.2, "thickness": "Great size", "radius": "Thin but not thin crispy", "bake": "The bake was okay, but I prefer it to be much crispier if it is a thin cookie", "base": "Base flavor was a little bland to me, especially considering it looked like it was covered in salt", "chocolate": "Chocolate is good but not out of this world", "comments": "Overall this cookie is decent, but I wouldn\u00d5t go out of my way to get it again", "lat": 25.7453592, "lon": -80.25931949999999}, {"name": "Pin Pin", "location": "Pin Pin Chamonix, France", "city": "Chamonix, France", "score": 5.2, "thickness": "Thick but very dry", "radius": "Big and airy", "bake": "Crispy edges but very dry, like the air in Chamonix", "base": "Tastes a little cardboard-y, rating goes down the more I eat it", "chocolate": "Okay... had higher expectations", "comments": "Not a great cookie. Got the pain au chocolat which was delicious - stick to the flaky pastries here.", "lat": 45.918769399999995, "lon": 6.8691298}, {"name": "Neverland Coffee Bar", "location": "Neverland Coffee Bar Miami", "city": "Miami", "score": 4.9, "thickness": "", "radius": "", "bake": "", "base": "", "chocolate": "", "comments": "", "lat": 25.940513, "lon": -80.150391}, {"name": "True Loaf Bakery", "location": "True Loaf Bakery", "city": "Miami", "score": null, "thickness": "", "radius": "", "bake": "", "base": "", "chocolate": "", "comments": "", "lat": 25.794725, "lon": -80.1438972}, {"name": "Bondi Sushi", "location": "Bondi sushi midtown miami", "city": "Miami", "score": 7.8, "thickness": "Not super thick", "radius": "Quite large", "bake": "A bit crumbly but had a nice chew", "base": "A great matcha flavor", "chocolate": "White chocolate to balance the matcha!", "comments": "This was a matcha cookie, so not a 1 for 1 comparison. Was pretty good though, a nice treat after sushi! Bonus points because the guy put it in our bag as a surprise \u263a\ufe0f", "lat": 25.8087417, "lon": -80.1925236}, {"name": "Win Son Bakery", "location": "Win Son Bakery Brooklyn", "city": "New York City", "score": 8.7, "thickness": "A thin one", "radius": "A large one", "bake": "For a thin cookie, this had the chewiness I hoped for. I really liked the mouth feel here!", "base": "This was delish! I LOVED the sea salt finish", "chocolate": "Chocolate is good, maybe a tad too sweet for my liking but not horrible", "comments": "I really really liked this cookie. For the thin cookie lovers out there this is for you. Would return.", "lat": 40.707242699999995, "lon": -73.94296589999999}];
+let DATA = BASE_DATA.map((d,i) => ({...d, id:'base:'+i}));
+
+function tierOf(score){
+  if(score >= 8) return 'high';
+  if(score >= 6) return 'mid';
+  return 'low';
+}
+function tierColor(tier){
+  return tier === 'high' ? '#8A9A5B' : (tier === 'mid' ? '#D98E3B' : '#B23A2E');
+}
+
+window.takeMeThere = function(lat, lon, btn){
+  const wrap = btn.closest('.p-directions');
+  const input = wrap ? wrap.querySelector('.dir-input') : null;
+  const originVal = input && input.value.trim() ? input.value.trim() : '';
+  const dest = lat + ',' + lon;
+  let url = 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(dest);
+  if(originVal) url += '&origin=' + encodeURIComponent(originVal);
+  window.open(url, '_blank');
+};
+
+// ---- map ----
+const map = L.map('map', {zoomControl:true}).setView([30, -50], 3);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', {
+  attribution:'&copy; OpenStreetMap &copy; CARTO',
+  maxZoom:19
+}).addTo(map);
+
+let markerLayer = L.layerGroup().addTo(map);
+
+function makeIcon(score){
+  const tier = tierOf(score);
+  const color = tierColor(tier);
+  return L.divIcon({
+    className:'',
+    html:`<div class="cookie-face" style="width:32px;height:32px;"><span class="cookie-badge" style="background:${color};">${score.toFixed(1)}</span></div>`,
+    iconSize:[32,32],
+    iconAnchor:[16,16],
+    popupAnchor:[0,-16]
+  });
+}
+
+let markers = {};
+
+function plotAll(){
+  markerLayer.clearLayers();
+  markers = {};
+  const cityVal = citySelect.value;
+  DATA.forEach((d, i) => {
+    if(d.lat == null || d.lon == null || d.score == null) return;
+    if(cityVal !== 'all' && d.city !== cityVal) return;
+    const icon = makeIcon(d.score);
+    const marker = L.marker([d.lat, d.lon], {icon});
+    const tier = tierOf(d.score);
+    marker.bindPopup(`
+      <div class="popup-inner">
+        <div class="p-name">${d.name}</div>
+        <div class="p-loc">${d.location}</div>
+        <div class="p-score" style="background:${tierColor(tier)}22;color:${tierColor(tier)};border:1px solid ${tierColor(tier)};">${d.score.toFixed(1)} / 10</div>
+        <div class="p-grid">
+          <div><b>Thickness</b> — ${d.thickness || '—'}</div>
+          <div><b>Radius</b> — ${d.radius || '—'}</div>
+          <div><b>Bake</b> — ${d.bake || '—'}</div>
+          <div><b>Base</b> — ${d.base || '—'}</div>
+          <div><b>Chocolate</b> — ${d.chocolate || '—'}</div>
+        </div>
+        ${d.comments ? `<div class="p-comment">"${d.comments}"</div>` : ''}
+        <div class="p-directions">
+          <input type="text" class="dir-input" placeholder="Your starting address (optional)">
+          <button type="button" class="dir-btn" onclick="window.takeMeThere(${d.lat}, ${d.lon}, this)">🚗 Take me there!</button>
+        </div>
+      </div>
+    `);
+    marker.addTo(markerLayer);
+    markers[i] = marker;
+  });
+
+  if(cityVal !== 'all'){
+    const bounds = Object.values(markers).map(m => m.getLatLng());
+    if(bounds.length) map.flyToBounds(bounds, {padding:[60,60], duration:0.6, maxZoom:13});
+  } else {
+    map.flyTo([30,-50], 3, {duration:0.6});
+  }
+}
+
+// ---- stats ----
+function renderStats(){
+  const scored = DATA.filter(d => d.score != null);
+  const avg = (scored.reduce((a,b)=>a+b.score,0) / scored.length).toFixed(1);
+  const best = scored.reduce((a,b)=> b.score > a.score ? b : a);
+  document.getElementById('statsRow').innerHTML = `
+    <div class="stat"><div class="num">${DATA.length}</div><div class="lbl">Cookies</div></div>
+    <div class="stat"><div class="num">${avg}</div><div class="lbl">Avg Score</div></div>
+    <div class="stat"><div class="num">${best.score}</div><div class="lbl">Top: ${best.name}</div></div>
+  `;
+}
+
+// ---- sidebar list ----
+const listEl = document.getElementById('list');
+const searchBox = document.getElementById('searchBox');
+const sortSelect = document.getElementById('sortSelect');
+const citySelect = document.getElementById('citySelect');
+
+function populateCityFilter(){
+  const cities = Array.from(new Set(DATA.map(d => d.city).filter(Boolean))).sort();
+  const current = citySelect.value || 'all';
+  citySelect.innerHTML = '<option value="all">All Cities</option>' +
+    cities.map(c => `<option value="${c}">${c}</option>`).join('');
+  if(cities.includes(current)) citySelect.value = current;
+}
+
+function render(){
+  const q = searchBox.value.trim().toLowerCase();
+  const sortMode = sortSelect.value;
+  const cityVal = citySelect.value;
+
+  let items = DATA.map((d,i) => ({...d, idx:i})).filter(d => d.score != null);
+  if(cityVal !== 'all'){
+    items = items.filter(d => d.city === cityVal);
+  }
+  if(q){
+    items = items.filter(d =>
+      d.name.toLowerCase().includes(q) || d.location.toLowerCase().includes(q)
+    );
+  }
+  if(sortMode === 'score-desc') items.sort((a,b)=>b.score-a.score);
+  if(sortMode === 'score-asc') items.sort((a,b)=>a.score-b.score);
+  if(sortMode === 'name-asc') items.sort((a,b)=>a.name.localeCompare(b.name));
+
+  listEl.innerHTML = items.map(d => {
+    const tier = tierOf(d.score);
+    return `<div class="row" data-idx="${d.idx}">
+      <div class="cookie-face" style="width:36px;height:36px;"><span class="cookie-badge" style="background:${tierColor(tier)};">${d.score.toFixed(1)}</span></div>
+      <div class="row-text">
+        <div class="name">${d.name}</div>
+        <div class="loc">${d.location}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.querySelectorAll('.row').forEach(row => {
+    row.addEventListener('click', () => {
+      const idx = row.getAttribute('data-idx');
+      const d = DATA[idx];
+      if(d.lat != null){
+        map.flyTo([d.lat, d.lon], 13, {duration:0.6});
+        if(markers[idx]) markers[idx].openPopup();
+      }
+      document.querySelectorAll('.row').forEach(r=>r.classList.remove('active'));
+      row.classList.add('active');
+      if(typeof setListOpen === 'function') setListOpen(false);
+    });
+  });
+
+}
+
+function refreshAll(){
+  populateCityFilter();
+  renderStats();
+  plotAll();
+  render();
+}
+
+searchBox.addEventListener('input', render);
+sortSelect.addEventListener('change', render);
+citySelect.addEventListener('change', () => { plotAll(); render(); });
+
+// ---- theme toggle ----
+const lightBtn = document.getElementById('lightBtn');
+const darkBtn = document.getElementById('darkBtn');
+function setMode(mode){
+  const isDark = mode === 'dark';
+  document.body.classList.toggle('dark-mode', isDark);
+  lightBtn.classList.toggle('active', !isDark);
+  darkBtn.classList.toggle('active', isDark);
+}
+lightBtn.addEventListener('click', () => setMode('light'));
+darkBtn.addEventListener('click', () => setMode('dark'));
+setMode('light');
+
+// ---- mobile list/map toggle ----
+const mobileTab = document.getElementById('mobileTab');
+const drawerHandle = document.getElementById('drawerHandle');
+function setListOpen(open){
+  document.body.classList.toggle('list-open', open);
+  setTimeout(() => map.invalidateSize(), 320);
+}
+mobileTab.addEventListener('click', () => {
+  setListOpen(!document.body.classList.contains('list-open'));
+});
+if(drawerHandle){
+  drawerHandle.addEventListener('click', () => {
+    setListOpen(!document.body.classList.contains('list-open'));
+  });
+}
+window.addEventListener('resize', () => map.invalidateSize());
+
+// ---- add/edit-cookie modal + persistent storage ----
+// ---- init ----
+(function init(){
+  refreshAll();
+})();
+</script>
+</body>
+</html>
