@@ -39,8 +39,12 @@ html,body{margin:0;padding:0;height:100%;background:var(--cream);color:var(--ink
 .app{display:grid;grid-template-columns:400px 1fr;height:100vh;}
 @media (max-width:860px){
   .app{display:flex;flex-direction:column;height:100vh;height:100dvh;position:relative;overflow:hidden;}
-  html,body{overflow:hidden;height:100%;}
-  #map{position:relative;flex:1;min-height:0;width:100%;order:2;}
+  html{height:100%;overflow:hidden;overscroll-behavior:none;}
+  body{
+    height:100%;overflow:hidden;overscroll-behavior:none;
+    position:fixed;top:0;left:0;right:0;bottom:0;width:100%;
+  }
+  #map{position:relative;flex:1;min-height:0;width:100%;order:2;overflow:hidden;}
 }
 
 /* ---------- SIDEBAR ---------- */
@@ -70,7 +74,7 @@ html,body{margin:0;padding:0;height:100%;background:var(--cream);color:var(--ink
     background:var(--cream);
     border-radius:20px 20px 0 0;
     box-shadow:0 -10px 30px rgba(0,0,0,0.35);
-    z-index:20;
+    z-index:200;
     transform:translateY(100%);
     transition:transform .3s ease;
   }
@@ -92,7 +96,7 @@ html,body{margin:0;padding:0;height:100%;background:var(--cream);color:var(--ink
   .mobile-tab{
     display:flex;align-items:center;justify-content:center;
     position:absolute;bottom:16px;left:50%;transform:translateX(-50%);
-    z-index:30;
+    z-index:300;
     width:44px;height:44px;border-radius:50%;
     background:var(--butter);color:#fff;border:none;cursor:pointer;
     box-shadow:0 6px 18px rgba(0,0,0,0.35);
