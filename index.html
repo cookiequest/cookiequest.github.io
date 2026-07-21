@@ -38,13 +38,14 @@ html,body{margin:0;padding:0;height:100%;background:var(--cream);color:var(--ink
 
 .app{display:grid;grid-template-columns:400px 1fr;height:100vh;}
 @media (max-width:860px){
-  .app{display:flex;flex-direction:column;height:100vh;height:100dvh;position:relative;overflow:hidden;}
-  html{height:100%;overflow:hidden;overscroll-behavior:none;}
+  .app{display:flex;flex-direction:column;height:100vh;height:100dvh;position:relative;overflow:hidden;touch-action:none;}
+  html{height:100%;overflow:hidden;overscroll-behavior:none;touch-action:none;}
   body{
-    height:100%;overflow:hidden;overscroll-behavior:none;
+    height:100%;overflow:hidden;overscroll-behavior:none;touch-action:none;
     position:fixed;top:0;left:0;right:0;bottom:0;width:100%;
   }
-  #map{position:relative;flex:1;min-height:0;width:100%;order:2;overflow:hidden;}
+  #map{position:relative;z-index:1;flex:1;min-height:0;width:100%;order:2;overflow:hidden;touch-action:none;}
+  .list{ touch-action:pan-y; -webkit-overflow-scrolling:touch; }
 }
 
 /* ---------- SIDEBAR ---------- */
